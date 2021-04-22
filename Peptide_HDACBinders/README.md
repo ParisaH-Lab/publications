@@ -48,15 +48,5 @@ Includes:
 3. The code required to exhaustively sample the torsions and residues in  residues immediately before and after anchor, `Method3-4_Exhaust.py`. Because the code goes through a large number of potential phi and psi angles, we usually run this *overnight*. The output of this stage is a csv file with the score of the pose, shape complementarity, computed ∆∆G (with or without repacking), number of unsatisfied hydrogen bonds at the interface, and peptide energy.
 4. The code required for exhaustive sampling (step 3) as well as design in method 4 (`Method4_Design.py`, `Method4_*.xml`). This design method goes through three different design runs, thus it takes *hours* for it to finish 
 
-## Docking
-Includes:
-1. `README.md` with details of how to run analysis
-2. **test** folder with sample input files
-3. **multistate_peptide_dask** folder with some necessary basic code to run the docking
-4. `environment.yml` file that contains the required files to reproduce the conda environment
-5. `run_roll.sh` file to run the docking in parallel (from `roll_demo.py`). This takes anywhere between *minutes to hours* depending on your access to parallel computing. The output is a csv file with scores as well as pickled poses from which final PDB can be extracted.
-6. `run_roll_undasked.sh` file to run the docking without parallel run (from `undasked_roll_demo.py`). This takes *few hours* to run. The output is a csv file with scores as well as pickled poses from which final PDB can be extracted.
-7. `parallel_dock_run_analysis_demo.ipynb` notebook demo. This also includes the analysis scripts and instruction on how to extract best scoring PDBs.
-
 # Output
 Because the processes of design and packing are stochastic, the output files can vary from run to run. Thus, we did not provide expected outputs. However, for each method, we clearly mentioned what the output should be if it is not a PDB or a silent file.
