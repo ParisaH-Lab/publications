@@ -1,0 +1,221 @@
+<ROSETTASCRIPTS>
+    <SCOREFXNS>
+        <!--Plain score function-->
+        <ScoreFunction name="beta" weights="ref2015"/>
+        <!--Turning on the constraints for cyclic bond-->
+        <ScoreFunction name="beta_cst" weights="ref2015">
+            <Reweight scoretype="coordinate_constraint" weight="1"/>
+            <Reweight scoretype="atom_pair_constraint" weight="1"/>
+            <Reweight scoretype="dihedral_constraint" weight="1"/>
+            <Reweight scoretype="angle_constraint" weight="1"/>
+        </ScoreFunction>
+        <!--Score with constraint and composition turned on-->
+        <ScoreFunction name="beta_comp" weights="ref2015">
+            <Reweight scoretype="coordinate_constraint" weight="1"/>
+            <Reweight scoretype="atom_pair_constraint" weight="1"/>
+            <Reweight scoretype="dihedral_constraint" weight="1"/>
+            <Reweight scoretype="angle_constraint" weight="1"/>
+            <Reweight scoretype="aa_composition" weight="1.0"/>
+        </ScoreFunction>
+        <!--Score with higher hbond weights to enhance hbond formation-->
+        <ScoreFunction name="high_hbond" weights="ref2015">
+            <Reweight scoretype="coordinate_constraint" weight="1"/>
+            <Reweight scoretype="atom_pair_constraint" weight="1"/>
+            <Reweight scoretype="dihedral_constraint" weight="1"/>
+            <Reweight scoretype="angle_constraint" weight="1"/>
+            <Reweight scoretype="hbond_lr_bb" weight="11.7"/>
+            <Reweight scoretype="hbond_sr_bb" weight="11.7"/>
+        </ScoreFunction>
+    </SCOREFXNS>
+
+    <RESIDUE_SELECTORS>
+
+        <!--selecting residues timportant for metal coordination into HDAD2-->
+        <Index name="HDAC2_ligands" resnums="144,172,199"/>
+        <!--selecting the chains-->
+        <Chain name="peptide" chains="B"/>
+        <Chain name="HDAC" chains="A"/>
+        <Chain name="Zinc" chains="C"/>
+        <Chain name="Water" chains="D,E"/>
+        <Or name="zinc_water"
+            selectors="Zinc,Water"/>
+        <!--making sure that D and L residue are designed properly-->
+        <Phi name="posPhi" select_positive_phi="true" />
+        <And name="posPhi_pep" selectors="peptide,posPhi"/>
+        <Phi name="negPhi" select_positive_phi="false" />
+        <And name="negPhi_pep" selectors="peptide,negPhi"/>
+        <!--Selecting SHA-->
+        <ResidueName name="SHA_sel_all" residue_name3="SHA,TRP" />
+        <And name="SHA_sel"
+             selectors="peptide,SHA_sel_all"/>
+        <!--select interface of chainB close within 8.0 A of chainA-->
+        <Neighborhood name="interface_chA" selector="peptide" distance="8.0"/>
+        <Neighborhood name="interface_chB" selector="HDAC" distance="8.0"/>
+        <And name="AB_interface" selectors="interface_chA,interface_chB"/>
+    </RESIDUE_SELECTORS>
+
+    <TASKOPERATIONS>
+        <!--proper resfiles for designing D or L residues-->
+        <ReadResfile name="l_res" filename="l_res.txt" selector="negPhi_pep"/>
+        <ReadResfile name="d_res" filename="d_res.txt" selector="posPhi_pep"/>
+    
+        <!--setting up the designable and repackable regions so that HDAC does not get designed and only parts around binder repack-->
+        <RestrictChainToRepacking name="only_repack_chain" chain="1"/>
+        <RestrictChainToRepacking name="only_repack_chain" chain="1"/>
+        <OperateOnResidueSubset name="no_repack_HDAC2_ligands" selector="HDAC2_ligands">
+            <PreventRepackingRLT/>
+        </OperateOnResidueSubset>
+        <OperateOnResidueSubset name="no_repack_zinc_water"
+            selector="zinc_water">
+            <PreventRepackingRLT />
+        </OperateOnResidueSubset>
+        <OperateOnResidueSubset name="no_design_SHA" selector="SHA_sel">
+            <RestrictToRepackingRLT/>
+        </OperateOnResidueSubset>
+        <DisallowIfNonnative name="no_cys" disallow_aas="CG"/>
+        <OperateOnResidueSubset name="no_repack_except_interface">
+            <And>
+                <Chain chains="1"/>
+                <Not>
+                    <Neighborhood distance="8.0">
+                        <Chain chains="2"/>
+                    </Neighborhood>
+                </Not>
+            </And>
+            <PreventRepackingRLT />
+        </OperateOnResidueSubset>
+        <OperateOnResidueSubset name="restrict_to_interface" selector="AB_interface">
+            <RestrictToRepackingRLT/>
+        </OperateOnResidueSubset>
+        <!--design related task operations-->
+        <LimitAromaChi2 name="limchi2"/>
+        <IncludeCurrent name="current"/>
+    </TASKOPERATIONS>
+
+    <FILTERS>
+        <!--Filter based on total score-->
+        <ScoreType name="score" scorefxn="beta" score_type="total_score" threshold="-400"/>
+        <ScoreType name="score_low" scorefxn="beta" score_type="total_score" threshold="0"/>
+        <!--interface shape complementarity-->
+        <ShapeComplementarity name="sc_filter" verbose="0" min_sc="0.5" write_int_area="1" jump="1" confidence="1"/>
+        <!--normal interface atomic contact count-->
+        <AtomicContactCount name="interface_contactcount" task_operations="restrict_to_interface" confidence="0"/>
+        <!--ddG w/ and w/o repack/min beta score function-->
+        <Ddg name="ddg"  threshold="-1" jump="1" repeats="5" repack="1" confidence="1" scorefxn="beta"/>
+        <Ddg name="ddg_norepack"  threshold="-1" jump="1" repeats="1" repack="0" confidence="1" scorefxn="beta"/>
+        <!--Computes the sasa specifically in the interface: total, hydrophobic, and polar-->
+        <Sasa name="interface_buried_sasa" confidence="0"/>
+        <Sasa name="interface_hydrophobic_sasa" confidence="0" hydrophobic="True"/>
+        <Sasa name="interface_polar_sasa" confidence="0" polar="True"/>
+        <!--calculates number of burried unsatisfied hydrogen bond donors/aceptors-->
+        <BuriedUnsatHbonds name="BUH" scorefxn="beta" confidence="0" jump_number="1"/>
+        <!--set of fliters to check for number of h_bonds to the backbone. Only from chainB of course. The final value should/can be changed as required/seems reasonable for the size given-->
+        <HbondsToResidue name="hbonds1" partners="0" energy_cutoff="-0.25" backbone="1" bb_bb="1" sidechain="0" residue="369" residue_selector="peptide"/>
+        <HbondsToResidue name="hbonds2" partners="0" energy_cutoff="-0.25" backbone="1" bb_bb="1" sidechain="0" residue="370" residue_selector="peptide"/>
+        <HbondsToResidue name="hbonds3" partners="0" energy_cutoff="-0.25" backbone="1" bb_bb="1" sidechain="0" residue="371" residue_selector="peptide"/>
+        <HbondsToResidue name="hbonds4" partners="0" energy_cutoff="-0.25" backbone="1" bb_bb="1" sidechain="0" residue="372" residue_selector="peptide"/>
+        <HbondsToResidue name="hbonds5" partners="0" energy_cutoff="-0.25" backbone="1" bb_bb="1" sidechain="0" residue="373" residue_selector="peptide"/>
+        <HbondsToResidue name="hbonds6" partners="0" energy_cutoff="-0.25" backbone="1" bb_bb="1" sidechain="0" residue="374" residue_selector="peptide"/>
+        <HbondsToResidue name="hbonds7" partners="0" energy_cutoff="-0.25" backbone="1" bb_bb="1" sidechain="0" residue="375" residue_selector="peptide"/>
+        <HbondsToResidue name="hbonds8" partners="0" energy_cutoff="-0.25" backbone="1" bb_bb="1" sidechain="0" residue="376" residue_selector="peptide"/>
+        <CombinedValue name="total_hbonds" threshold="-1.5">
+            <Add filter_name="hbonds1" factor="-0.5"/>
+            <Add filter_name="hbonds2" factor="-0.5"/>
+            <Add filter_name="hbonds3" factor="-0.5"/>
+            <Add filter_name="hbonds4" factor="-0.5"/>
+            <Add filter_name="hbonds5" factor="-0.5"/>
+            <Add filter_name="hbonds6" factor="-0.5"/>
+            <Add filter_name="hbonds7" factor="-0.5"/>
+            <Add filter_name="hbonds8" factor="-0.5"/>
+        </CombinedValue>
+    </FILTERS>
+    
+    <MOVERS>
+        <!--Extending the stub-->
+        <PeptideStubMover name="extend" reset="0">
+            <Append resname="GLY" repeat="3"/>
+            <Prepend resname="GLY" anchor_rsd="369" repeat="2"/>
+        </PeptideStubMover>
+        <!--Settting Torsions of newly generated residues to omega 180-->
+        <SetTorsion name="set_torsion" foldtree_root="371">
+            <Torsion residue="369,370,374,375,376" torsion_name="omega" angle="180"/>
+        </SetTorsion>
+        <!--Adds the required constraints to peptide bond to keep it close-->
+        <PeptideCyclizeMover name="cyclize" residue_selector="peptide"/>
+        <!--Parsed protocol that can be used for pre_selection in the genKIC-->
+        <!--Currently number of hydrogen bonds and score-->
+        <ParsedProtocol name="preselection_pp">
+            <Add filter="total_hbonds"/>
+            <Add filter="score_low"/>
+        </ParsedProtocol>
+        <!--Relax pre KIC-->
+        <FastRelax name="relax" scorefxn="beta_cst" repeats="2" ramp_down_constraints="false">
+            <MoveMap name="specifics">
+                <Jump number="1" setting="0" />
+                <Jump number="2" setting="0" />
+                <Jump number="3" setting="0" />
+                <Jump number="4" setting="0" />
+                <Chain number="1" chi="0" bb="0"/> #have to stop from minimization or it takes forever
+                <Span begin="371" end="373" chi="0" bb="0"/>
+            </MoveMap>
+        </FastRelax>
+
+        <!--GenKIC. Added the custom rama table so that it doesn't bias the pose to just L-aas as we saw the presence of Ds enhance foldability. The preselection mover is basically a count of h-bonds to backbone at this stage (no-designs yet) to increase rigiity and chance of folding-->
+        <GeneralizedKIC name="genkic" closure_attempts="1000" stop_when_n_solutions_found="1" selector="lowest_energy_selector" selector_scorefunction="high_hbond" pre_selection_mover="preselection_pp">
+            AddResidue res_index="373"/>
+            <AddResidue res_index="374"/>
+            <AddResidue res_index="375"/>
+            <AddResidue res_index="376"/>
+            <AddResidue res_index="369"/>
+            <AddResidue res_index="370"/>
+            AddResidue res_index="371"/>
+            <CloseBond res1="376" atom1="C" res2="369" atom2="N" bondlength="1.32" angle1="114" angle2="123" torsion="180"/>
+            <SetPivots res1="374" res2="376" res3="370" atom1="CA" atom2="CA" atom3="CA"/>
+            <AddPerturber effect="randomize_alpha_backbone_by_rama" custom_rama_table="flat_symm_dl_aa_ramatable">
+                <AddResidue index="375"/>
+                <AddResidue index="369"/>
+            </AddPerturber>
+            <AddFilter type="loop_bump_check"/>
+        </GeneralizedKIC>
+        <!--autoamtically set a useful atom tree that does not mess up minimization-->
+        <AtomTree name="docking_tree" docking_ft="1"/>
+        <!--small perturbations on peptide to be able to explore other minima-->
+        <RollMover name="roll" chain="1" random_roll="true"/>
+        <!--roll so that you get the best sc-->
+        <GenericMonteCarlo name="roll_gmc" mover_name="roll" filter_name="ddg" trials="5"/>
+        <!--Design-->
+        <FastDesign name="design" task_operations="d_res,l_res,only_repack_chain,no_repack_except_interface,no_design_SHA,no_repack_zinc_water,no_cys,limchi2,current" scorefxn="beta_cst" repeats="1" ramp_down_constraints="false">
+            <MoveMap name="specifics">
+                <Jump number="1" setting="0" />
+                <Jump number="2" setting="0" />
+                <Jump number="3" setting="0" />
+                <Jump number="4" setting="0" />
+                <Chain number="1" chi="0" bb="0"/> #have to stop from minimization or it takes forever
+            </MoveMap>
+        </FastDesign>
+    </MOVERS>
+    <APPLY_TO_POSE>
+    </APPLY_TO_POSE>
+    <PROTOCOLS>
+        <Add mover="extend"/>
+        <Add mover="set_torsion"/>
+        <Add mover="cyclize"/>
+        <Add mover="relax"/>
+        <Add mover="genkic"/>
+        <Add mover="docking_tree"/>
+        <Add mover="cyclize"/>
+        <Add mover="design"/>
+        <Add mover="roll_gmc"/>
+        <Add mover="cyclize"/>
+        <Add filter="score"/>
+        <Add filter="sc_filter"/>
+        <Add filter="interface_contactcount"/>
+        <Add filter="ddg"/>
+        <Add filter="ddg_norepack"/>
+        <Add filter="interface_buried_sasa"/>
+        <Add filter="interface_hydrophobic_sasa"/>
+        <Add filter="interface_polar_sasa"/>
+        <Add filter="BUH"/>
+    </PROTOCOLS>
+    <OUTPUT />
+</ROSETTASCRIPTS>

@@ -1,0 +1,4 @@
+RESET
+NOTAA CG
+
+start

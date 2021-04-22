@@ -1,0 +1,270 @@
+<ROSETTASCRIPTS>
+
+    <SCOREFXNS>
+        <!--Default score function-->
+        <ScoreFunction name="score" weights="ref2015"/>
+        <!--Cartesian score function-->
+        <ScoreFunction name="score_cart" weights="ref2015_cart"/>
+        <!--Score function with constraints required for N-C bond-->
+        <ScoreFunction name="score_cst" weights="ref2015">
+            <Reweight scoretype="coordinate_constraint" weight="1"/>
+            <Reweight scoretype="atom_pair_constraint" weight="1"/>
+            <Reweight scoretype="dihedral_constraint" weight="1"/>
+            <Reweight scoretype="angle_constraint" weight="1"/>
+        </ScoreFunction>
+        <!--Score function with elevated focus of hydrogen bonds-->
+        <ScoreFunction name="high_hbond" weights="ref2015">
+            <Reweight scoretype="coordinate_constraint" weight="1"/>
+            <Reweight scoretype="atom_pair_constraint" weight="1"/>
+            <Reweight scoretype="dihedral_constraint" weight="1"/>
+            <Reweight scoretype="angle_constraint" weight="1"/>
+            <Reweight scoretype="hbond_lr_bb" weight="11.7"/>
+            <Reweight scoretype="hbond_sr_bb" weight="11.7"/>
+        </ScoreFunction>
+        <!--Score function with constraints, higher hydrogen bond term, and aa composition for design-->
+        <ScoreFunction name="score_cst_comp" weights="ref2015.wts">
+            <Reweight scoretype="atom_pair_constraint" weight="1.0"/>
+            <Reweight scoretype="angle_constraint" weight="1.0"/>
+            <Reweight scoretype="dihedral_constraint" weight="1.0"/>
+            <Reweight scoretype="aa_composition" weight="2.0" />
+            <Reweight scoretype="hbond_lr_bb" weight="11.7"/>
+            <Reweight scoretype="hbond_sr_bb" weight="11.7"/>
+        </ScoreFunction>
+    </SCOREFXNS>
+
+    <RESIDUE_SELECTORS>
+        <!--Degining peptide and protein chain-->
+        <Chain name="peptide" chains="2"/>
+        <Chain name="HDAC" chains="1"/>
+        <!--Residues that coordinate to Zn and should not move-->
+        <Index name="stub" resnums="373,374,375" />
+        <Not name="noS" selector="stub"/>
+        <And name="peptide_noS" selectors="peptide,noS"/>
+        
+        <!--Selecting interfaces-->
+        <Neighborhood name="interface_chA" selector="peptide" distance="8.0"/>
+        <Neighborhood name="interface_chB" selector="HDAC" distance="8.0"/>
+        <And name="AB_interface" selectors="interface_chA,interface_chB"/>
+        <!--Selecting all residues in the peptide that can be used to count hydrogen bonds-->
+        <Index name="res1_sur" resnums="372,373,374,375,376,377"/>
+        <Index name="res2_sur" resnums="373,374,375,376,377,378"/>
+        <Index name="res3_sur" resnums="370,374,375,376,377,378"/>
+        <Index name="res4_sur" resnums="370,371,375,376,377,378"/>
+        <Index name="res5_sur" resnums="370,371,372,376,377,378"/>
+        <Index name="res6_sur" resnums="370,371,372,373,377,378"/>
+        <Index name="res7_sur" resnums="370,371,372,373,374,378"/>
+        <Index name="res8_sur" resnums="370,371,372,373,374,375"/>
+        <Index name="res9_sur" resnums="371,372,373,374,375,376"/>
+        
+        <!--Selecting protein residues at the binding pocket-->
+        <Index name="around" resnums="25,146,267,299"/>
+        <Neighborhood name="approx" selector="around" distance="2.5"/>
+        <And name="vicinity" selectors="peptide,approx"/>
+        
+    </RESIDUE_SELECTORS>
+
+    <TASKOPERATIONS>
+        <!--Defining what to pack and what to keep as is-->
+        <OperateOnResidueSubset name="justrepack" selector="peptide">
+            <RestrictToRepackingRLT/>
+        </OperateOnResidueSubset>
+        <OperateOnResidueSubset name="norepack" selector="HDAC">
+            <PreventRepackingRLT/>
+        </OperateOnResidueSubset>
+
+    </TASKOPERATIONS>
+    
+    <SIMPLE_METRICS>
+        <!--Counting residues around the protein pocket-->
+        <SelectedResidueCountMetric name="count_close" residue_selector="vicinity" />
+    </SIMPLE_METRICS>
+
+    <FILTERS>
+        <!--Score filter-->
+        <ScoreType name="score_all" scorefxn="score" score_type="total_score" threshold="-500"/>
+        <ScoreType name="score_low" scorefxn="score" score_type="total_score" threshold="-200"/>
+        
+        <!--calculates number of burried unsatisfied hydrogen bond donors/aceptors-->
+        <BuriedUnsatHbonds use_legacy_options="false" name="BUH" scorefxn="score" jump_number="1" use_ddG_style="false" cutoff="20000" residue_selector="AB_interface"/>
+        
+        <!--set of fliters to check for number of h_bonds to the backbone-->
+        <HbondsToResidue name="hbonds1" partners="0" energy_cutoff="-0.25" backbone="1" bb_bb="1" sidechain="0" residue="370" residue_selector="res1_sur"/>
+        <HbondsToResidue name="hbonds2" partners="0" energy_cutoff="-0.25" backbone="1" bb_bb="1" sidechain="0" residue="371" residue_selector="res2_sur"/>
+        <HbondsToResidue name="hbonds3" partners="0" energy_cutoff="-0.25" backbone="1" bb_bb="1" sidechain="0" residue="372" residue_selector="res3_sur"/>
+        <HbondsToResidue name="hbonds4" partners="0" energy_cutoff="-0.25" backbone="1" bb_bb="1" sidechain="0" residue="373" residue_selector="res4_sur"/>
+        <HbondsToResidue name="hbonds5" partners="0" energy_cutoff="-0.25" backbone="1" bb_bb="1" sidechain="0" residue="374" residue_selector="res5_sur"/>
+        <HbondsToResidue name="hbonds6" partners="0" energy_cutoff="-0.25" backbone="1" bb_bb="1" sidechain="0" residue="375" residue_selector="res6_sur"/>
+        <HbondsToResidue name="hbonds7" partners="0" energy_cutoff="-0.25" backbone="1" bb_bb="1" sidechain="0" residue="376" residue_selector="res7_sur"/>
+        <HbondsToResidue name="hbonds8" partners="0" energy_cutoff="-0.25" backbone="1" bb_bb="1" sidechain="0" residue="377" residue_selector="res8_sur"/>
+        <HbondsToResidue name="hbonds9" partners="0" energy_cutoff="-0.25" backbone="1" bb_bb="1" sidechain="0" residue="378" residue_selector="res9_sur"/>
+        <CombinedValue name="total_hbonds" threshold="-1.0">
+            <Add filter_name="hbonds1" factor="-0.5"/>
+            <Add filter_name="hbonds2" factor="-0.5"/>
+            <Add filter_name="hbonds3" factor="-0.5"/>
+            <Add filter_name="hbonds4" factor="-0.5"/>
+            <Add filter_name="hbonds5" factor="-0.5"/>
+            <Add filter_name="hbonds6" factor="-0.5"/>
+            <Add filter_name="hbonds7" factor="-0.5"/>
+            <Add filter_name="hbonds8" factor="-0.5"/>
+            <Add filter_name="hbonds9" factor="-0.5"/>
+        </CombinedValue>
+        <!--filtering Rosetta hydrogen bond pathology-->
+        <OversaturatedHbondAcceptorFilter name="oversat" scorefxn="score" donor_selector="peptide" acceptor_selector="peptide"/>
+        <!--interface shape complementarity-->
+        <ShapeComplementarity name="sc_filter" verbose="0" min_sc="0.5" write_int_area="1" jump="1" confidence="0"/>
+        <!--ddG w/ and w/o repack/min score score function-->
+        <Ddg name="ddg"  threshold="-1" jump="1" repeats="5" repack="1" confidence="0" scorefxn="score"/>
+        <Ddg name="ddg_norepack"  threshold="-1" jump="1" repeats="1" repack="0" confidence="0" scorefxn="score"/>
+        <!--Computes the sasa specifically in the interface: total, hydrophobic, and polar-->
+        <Sasa name="interface_buried_sasa" confidence="0"/>
+        <Sasa name="interface_hydrophobic_sasa" confidence="0" hydrophobic="True"/>
+        <Sasa name="interface_polar_sasa" confidence="0" polar="True"/>
+        <!--Energy of peptide-->
+        <ResidueSetChainEnergy name="pep_E" scorefxn="score" score_type="total_score" chain="2" threshold="50" resnums="370,371,372,373,374,375,376,377,378"/>
+        <!--Unsatisfide hydrogen bonds-->
+        <BuriedUnsatHbonds name="new_buns_bb_heavy" use_reporter_behavior="true" report_bb_heavy_atom_unsats="true" scorefxn="score" residue_surface_cutoff="15.0" ignore_surface_res="false" print_out_info_to_pdb="true" confidence="0" residue_selector="peptide" use_vsasa="false" use_hbnet_behavior="true"/>
+        <!--Counting contacts between peptide and protein pocket-->
+        <SimpleMetricFilter name="contact_filter" metric="count_close" cutoff="1" comparison_type="gt_or_eq" confidence="0"/>
+    </FILTERS>
+    
+    <JUMP_SELECTORS>
+        <!--Defining Jumps to move-->
+        <JumpIndex name="jump1" jump="1" />
+        <JumpIndex name="jump2" jump="2" />
+        <And name="fixed_jumps" selectors="jump1,jump2" />
+        <Not name="movable_jumps" selector="fixed_jumps" />
+    </JUMP_SELECTORS>
+    
+    <MOVE_MAP_FACTORIES>
+        <!--Defining protein and peptide parts to minimize-->
+        <MoveMapFactory name="frlx_mm_factory" bb="false" chi="false" jumps="false">
+            <Backbone residue_selector="peptide_noS" />
+            <Chi residue_selector="peptide" />
+            <Jumps jump_selector="movable_jumps" />
+        </MoveMapFactory>
+        <MoveMapFactory name="min_mm" bb="false" chi="false" jumps="false">
+            <Backbone residue_selector="peptide" />
+            <Chi residue_selector="peptide" />
+            <Jumps jump_selector="movable_jumps" />
+        </MoveMapFactory>
+    </MOVE_MAP_FACTORIES>
+    
+    <MOVERS>
+        <!--Defining docking atom tree to keep peptide and protein close-->
+        <AtomTree name="docking_tree" docking_ft="true" />
+        <!--Minimizing peptide to get peptide energy-->
+        <MinMover name="min_pep" scorefxn="score_cart" movemap_factory="min_mm" cartesian="true"/>
+        <!--Relax-->
+        <FastRelax name="relax2" scorefxn="high_hbond" repeats="3" task_operations="justrepack,norepack" cartesian="false" movemap_factory="frlx_mm_factory" />
+        <!--Moving peptide around in the protein pocket-->
+        <Shear name="shake" residue_selector="peptide" scorefxn="score"/>
+        <!--Removing variant types to be able to add cyclic bond-->
+        <ModifyVariantType name="removeC" remove_type="UPPER_TERMINUS_VARIANT" />
+        <ModifyVariantType name="removeN" remove_type="LOWER_TERMINUS_VARIANT" />
+        <!--Extending the stub-->
+        <PeptideStubMover name="add_stub" reset="false" >
+            <Insert resname="%%res4%%" anchor_rsd="370" />
+            <Prepend resname="%%res2%%" anchor_rsd="370" />
+        </PeptideStubMover>
+        <!--Moving phi and psi of anchor to sample different orientations-->
+        <SetTorsion name="randompsi" foldtree_root="371" >
+            <Torsion residue="371" torsion_name="psi" angle="random"/>
+        </SetTorsion>
+        <SetTorsion name="randomphi" foldtree_root="372" >
+            <Torsion residue="371" torsion_name="phi" angle="random"/>
+        </SetTorsion>
+        <!--Setting all torsions to 180-->
+        <SetTorsion name="set_torsion_init" foldtree_root="371">
+            <Torsion residue="370,371,372" torsion_name="omega" angle="180"/>
+            <Torsion residue="370" torsion_name="phi" angle="%%phi2%%"/>
+            <Torsion residue="370" torsion_name="psi" angle="%%psi2%%"/>
+            <Torsion residue="372" torsion_name="phi" angle="%%phi4%%"/>
+            <Torsion residue="372" torsion_name="psi" angle="%%psi4%%"/>
+        </SetTorsion>
+        <!--Extending to the desired length-->
+        <PeptideStubMover name="extend" reset="false" >
+            <Insert resname="GLY" anchor_rsd="372" />
+            <Insert resname="GLY" anchor_rsd="373" />
+            <Insert resname="GLY" anchor_rsd="374" />
+            <Prepend resname="GLY" anchor_rsd="370" />
+            <Prepend resname="GLY" anchor_rsd="370" />
+            <Prepend resname="GLY" anchor_rsd="370" />
+        </PeptideStubMover>
+        <!--Setting all new torsions to 180-->
+        <SetTorsion name="set_torsion_fin" foldtree_root="374">
+            <Torsion residue="370,371,372,373,374,375,376,377,378" torsion_name="omega" angle="180"/>
+            <Torsion residue="373" torsion_name="phi" angle="%%phi2%%"/>
+            <Torsion residue="373" torsion_name="psi" angle="%%psi2%%"/>
+            <Torsion residue="375" torsion_name="phi" angle="%%phi4%%"/>
+            <Torsion residue="375" torsion_name="psi" angle="%%psi4%%"/>
+        </SetTorsion>
+        <!--Adds the required constraints to peptide bond to keep it close-->
+        <PeptideCyclizeMover name="cyclize" residue_selector="peptide"/>
+        <!--KIC preselction based on total hbond and a loose score threshold-->
+        <ParsedProtocol name="preselection_pp">
+            <Add filter="total_hbonds"/>
+            <Add filter="score_low"/>
+        </ParsedProtocol>
+        <!--KIC closure-->
+        <GeneralizedKIC name="genkic" closure_attempts="500" stop_when_n_solutions_found="1" selector="lowest_energy_selector" selector_scorefunction="high_hbond" pre_selection_mover="preselection_pp">
+            <AddResidue res_index="376"/>
+            <AddResidue res_index="377"/>
+            <AddResidue res_index="378"/>
+            <AddResidue res_index="370"/>
+            <AddResidue res_index="371"/>
+            <AddResidue res_index="372"/>
+            <CloseBond res1="378" atom1="C" res2="370" atom2="N" bondlength="1.32" angle1="114" angle2="123" torsion="180"/>
+            <SetPivots res1="376" res2="378" res3="372" atom1="CA" atom2="CA" atom3="CA"/>
+            <AddPerturber effect="randomize_alpha_backbone_by_rama" custom_rama_table="flat_symm_dl_aa_ramatable">
+                <AddResidue index="370"/>
+                <AddResidue index="371"/>
+                <AddResidue index="377"/>
+            </AddPerturber>
+            <AddFilter type="loop_bump_check"/>
+            <AddFilter type="rama_prepro_check" rama_cutoff_energy="1.0" residue="376" />
+            <AddFilter type="rama_prepro_check" rama_cutoff_energy="1.0" residue="378" />
+            <AddFilter type="rama_prepro_check" rama_cutoff_energy="1.0" residue="372" />
+        </GeneralizedKIC>
+        <!--Calling in the binder design script-->
+        <MultiplePoseMover name="design">
+            <xi:include href="GeneralDesign.xml" />
+        </MultiplePoseMover>
+        <!--Adding disulfides to the peptide if possible-->
+        <Disulfidize name="disulf_pep" scorefxn="score" set1="peptide_noS" set2="peptide_noS" min_loop="2" use_l_cys="true" use_d_cys="true" min_disulfides="0" />
+        <!--Series of analysis on the binding metrics-->
+        <InterfaceAnalyzerMover name="interface" scorefxn="score" packstat="true" interface_sc="true" pack_input="false" pack_separated="1" jump="1" />
+
+    </MOVERS>
+    <APPLY_TO_POSE>
+    </APPLY_TO_POSE>
+    <PROTOCOLS>
+        <Add mover="add_stub" />
+        <Add mover="set_torsion_init" />
+        <Add mover="randomphi"/>
+        <Add mover="randompsi"/>
+        <Add mover="docking_tree"/>
+        <Add mover="min_pep" />
+        <Add mover="extend"/>
+        <Add mover="set_torsion_fin"/>
+        <Add mover="shake"/>
+        <Add mover="removeN"/>
+        <Add mover="removeC"/>
+        <Add mover="cyclize"/>
+        <Add mover="genkic"/>
+        <Add mover="design" />
+        <Add mover="disulf_pep" />
+        <Add filter="new_buns_bb_heavy"/>
+        <Add filter="sc_filter"/>
+        <Add filter="ddg"/>
+        <Add filter="ddg_norepack"/>
+        <Add filter="interface_buried_sasa"/>
+        <Add filter="interface_hydrophobic_sasa"/>
+        <Add filter="interface_polar_sasa"/>
+        <Add filter="BUH"/>
+        <Add filter="oversat"/>
+        <Add filter="pep_E"/>
+        <Add filter="total_hbonds"/>
+        <Add filter="contact_filter"/>
+    </PROTOCOLS>
+    <OUTPUT />
+</ROSETTASCRIPTS>

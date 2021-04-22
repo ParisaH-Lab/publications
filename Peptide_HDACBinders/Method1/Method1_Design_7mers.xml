@@ -1,0 +1,118 @@
+<ROSETTASCRIPTS>
+	<SCOREFXNS>
+        <!--General score function to use-->
+		<ScoreFunction name="beta" weights="ref2015.wts" />
+        <!--Score function with constraints on for cyclization-->
+		<ScoreFunction name="beta_cst" weights="ref2015.wts">
+			<Reweight scoretype="atom_pair_constraint" weight="1.0" />
+			<Reweight scoretype="angle_constraint" weight="1.0" />
+			<Reweight scoretype="dihedral_constraint" weight="1.0" />
+		</ScoreFunction>
+	</SCOREFXNS>
+    
+    <RESIDUE_SELECTORS>
+        <!--Peptide is at chain 2-->
+        <Chain name="design" chains="2"/>
+        <!--Defining positive and negative phi regions to ensure correct chirality-->
+        <Phi name="posPhi" select_positive_phi="true" />
+        <And name="posPhi_design" selectors="design,posPhi"/>
+        <Phi name="negPhi" select_positive_phi="false" />
+        <And name="negPhi_design" selectors="design,negPhi"/>
+        <!--Not mutating Prolines-->
+        <ResidueName name="pro" residue_name3="PRO,DPR" />
+        <!--Defining where SHA is and where Prolines are-->
+        <Index name="stub" resnums="%%num%%" />
+        <Index name="KEY" resnums="%%k_n%%"/>
+        <!--Selecting protein chain, chain A-->
+        <Chain name="chainA" chains="1" />
+        <!--Defining interface for measuring interface metrics-->
+        <Neighborhood name="interface" distance="8.0" selector="design" />
+        <Not name="not_interface_all" selector="interface" />
+        <And name="not_interface" selectors="chainA,not_interface_all" />
+        <Or name="design_interface" selectors="design,interface"/>
+    </RESIDUE_SELECTORS>
+    
+	<TASKOPERATIONS>
+        <!--Don't design the protein chain-->
+        <RestrictChainToRepacking name="only_repack_chain" chain="1" />
+        <!--Don't design Prolines-->
+        <OperateOnResidueSubset name="no_design_pro" selector="KEY" >
+            <RestrictToRepackingRLT/>
+        </OperateOnResidueSubset>
+        <!--Don't design SHA-->
+        <RestrictResiduesToRepacking name="no_repack_stub" residues="%%num%%" />
+        <!--Don't repalc residues that coordiante to Zinc-->
+        <PreventResiduesFromRepacking name="preventphe" residues="144,172,199"/>
+        <!--proper resfiles for designing D or L residues-->
+        <ReadResfile name="l_res" filename="l_res.txt" selector="negPhi_design"/>
+        <ReadResfile name="d_res" filename="d_res.txt" selector="posPhi_design"/>
+        <!--Do not put Cys residues in design-->
+        <DisallowIfNonnative name="no_cys" disallow_aas="CG" />
+        <!--If residue is not in the interface, don't repack and keep untouched-->
+        <!--Saves computation time-->
+        <OperateOnResidueSubset name="no_repack_except_interface" selector="not_interface">
+            <PreventRepackingRLT />
+        </OperateOnResidueSubset>
+	</TASKOPERATIONS>
+    
+	<FILTERS>
+        <!--Sets of filters to check the interface and select designs with-->
+        <ScoreType name="checkscore" scorefxn="beta" score_type="total_score" threshold="-500" confidence="0"/>
+        <ShapeComplementarity name="sc" jump="4" verbose="1" min_sc="0.65" confidence="0"/>
+        <Ddg name="ddG_filt" scorefxn="beta" jump="4" repack="1" repeats="3" threshold="-5" confidence="0"/>
+        <Holes name="holes" threshold="1.8" confidence="0" residue_selector="interface"/>
+        <DSasa name="dsasa" lower_threshold="0.8" confidence="0" />
+        <Sasa name="interface_buried_sasa" confidence="0" jump="4"/>
+        <Sasa name="interface_hydrophobic_sasa" confidence="0" hydrophobic="False" jump="4"/>
+        <Sasa name="interface_polar_sasa" confidence="0" polar="True" jump="4"/>
+        <BuriedUnsatHbonds name="new_buns_bb_heavy" residue_selector="design_interface" report_bb_heavy_atom_unsats="true" scorefxn="score" cutoff="4" residue_surface_cutoff="20.0" ignore_surface_res="true" print_out_info_to_pdb="true" />
+        <BuriedUnsatHbonds name="new_buns_sc_heavy" residue_selector="design_interface" report_sc_heavy_atom_unsats="true" scorefxn="score" cutoff="4" residue_surface_cutoff="20.0" ignore_surface_res="true" print_out_info_to_pdb="true" />
+	</FILTERS>
+    
+	<MOVERS>
+        <!--Mutate the docked residue to SHA-->
+        <MutateResidue name="mutateA" residue_selector="stub" new_res="SHA" preserve_atom_coords="1" />
+        <!--Defines the fold tree-->
+        <AtomTree name="foldtree1" fold_tree_file="foldtree_7ALA.txt"/>
+        <!--Design-->
+        <FastDesign name="design" task_operations="d_res,l_res,preventphe,only_repack_chain,no_repack_except_interface,no_repack_stub,no_cys,no_design_pro" repeats="5" scorefxn="beta_cst" ramp_down_constraints="false" >
+            <MoveMap name="frlx1_mm">
+                <Jump number="1" setting="0" />
+                <Jump number="2" setting="0" />
+                <Jump number="3" setting="0" />
+                <Jump number="4" setting="0" />
+                <Span begin="1" end="92" bb="0" chi="0" />
+                <Span begin="93" end="93" bb="0" chi="0" />
+                <Span begin="94" end="368" bb="0" chi="0" />
+                <Span begin="369" end="371" bb="0" chi="0" />
+                <Span begin="372" end="378" bb="1" chi="1" />
+            </MoveMap>
+        </FastDesign>
+        <!--Make sure peptide chain is cyclic-->
+        <PeptideCyclizeMover name="cyclize" residue_selector="design"/>
+  	</MOVERS>
+        
+	<APPLY_TO_POSE>
+	</APPLY_TO_POSE>
+    
+	<PROTOCOLS>
+        <Add mover="mutateA" />
+        <Add mover="cyclize"/>
+        <Add mover="foldtree1"/>
+        <Add mover="design" />
+        <Add mover="cyclize"/>
+        <Add filter="checkscore"/>
+        <Add filter="sc"/>
+        <Add filter="ddG_filt"/>
+        <Add filter="dsasa"/>
+        <Add filter="checkscore" />
+        <Add filter="interface_buried_sasa"/>
+        <Add filter="interface_hydrophobic_sasa"/>
+        <Add filter="interface_polar_sasa"/>
+        <Add filter="new_buns_bb_heavy"/>
+        <Add filter="new_buns_sc_heavy"/>
+        <Add filter="holes"/>
+	</PROTOCOLS>
+    
+	<OUTPUT />
+</ROSETTASCRIPTS>

@@ -1,0 +1,31 @@
+<ROSETTASCRIPTS>
+	<SCOREFXNS>
+		<tala weights="ref2015.wts" />
+		<tala_cst weights="ref2015.wts">
+			<Reweight scoretype="atom_pair_constraint" weight="1.0"/>
+			<Reweight scoretype="angle_constraint" weight="1.0" />
+			<Reweight scoretype="dihedral_constraint" weight="1.0"/>
+		</tala_cst>
+	</SCOREFXNS>
+	<TASKOPERATIONS>
+	</TASKOPERATIONS>
+	<FILTERS>
+	    <ResidueCount name="gly_count" max_residue_count="2" min_residue_count="0" residue_types="GLY" count_as_percentage="0" />
+        <ScoreType name="checkscore" scorefxn="tala" score_type="total_score" threshold="-400"/>
+        
+	</FILTERS>
+	<MOVERS>
+        <AddChain name="merge" file_name="%%alnpdb%%" new_chain="1" scorefxn="tala" random_access="0" swap_chain_number="0"/>
+        <DeclareBond name="bond" res1="370" atom1="N" res2="377" atom2="C"/>
+
+
+	</MOVERS>
+	<APPLY_TO_POSE>
+	</APPLY_TO_POSE>
+	<PROTOCOLS>
+        <Add mover="merge" />
+        <Add mover="bond" />
+        <Add filter_name="checkscore"/>
+	</PROTOCOLS>
+	<OUTPUT />
+</ROSETTASCRIPTS>

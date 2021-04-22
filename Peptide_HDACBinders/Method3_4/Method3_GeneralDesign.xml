@@ -1,0 +1,137 @@
+<ROSETTASCRIPTS>
+	<SCOREFXNS>
+        <!--Default score function-->
+        <ScoreFunction name="score" weights="ref2015"/>
+        <!--Cartesian score function-->
+        <ScoreFunction name="score_cart" weights="ref2015_cart"/>
+        <!--Score function with constraints required for N-C bond-->
+        <ScoreFunction name="score_cst" weights="ref2015">
+            <Reweight scoretype="coordinate_constraint" weight="1"/>
+            <Reweight scoretype="atom_pair_constraint" weight="1"/>
+            <Reweight scoretype="dihedral_constraint" weight="1"/>
+            <Reweight scoretype="angle_constraint" weight="1"/>
+        </ScoreFunction>
+        <!--Score function with elevated hydrogen bond weight-->
+        <ScoreFunction name="high_hbond" weights="ref2015">
+            <Reweight scoretype="coordinate_constraint" weight="1"/>
+            <Reweight scoretype="atom_pair_constraint" weight="1"/>
+            <Reweight scoretype="dihedral_constraint" weight="1"/>
+            <Reweight scoretype="angle_constraint" weight="1"/>
+            <Reweight scoretype="hbond_lr_bb" weight="11.7"/>
+            <Reweight scoretype="hbond_sr_bb" weight="11.7"/>
+        </ScoreFunction>
+        <!--Design score function with constraints, aa composition, and elevated hbond-->
+        <ScoreFunction name="score_cst_comp_guide" weights="ref2015.wts">
+            <Reweight scoretype="atom_pair_constraint" weight="1.0"/>
+            <Reweight scoretype="angle_constraint" weight="1.0"/>
+            <Reweight scoretype="dihedral_constraint" weight="1.0"/>
+            <Reweight scoretype="aa_composition" weight="2.0" />
+            <Reweight scoretype="hbond_lr_bb" weight="11.7"/>
+            <Reweight scoretype="hbond_sr_bb" weight="11.7"/>
+        </ScoreFunction>
+    </SCOREFXNS>
+    
+    <RESIDUE_SELECTORS>
+        <!--Selecting peptide and protein chains-->
+        <Chain name="peptide" chains="B"/>
+        <Chain name="HDAC" chains="A"/>
+        <Chain  name="zinc" chains="C"/>
+        <!--Selecting anchor to prevent moving-->
+        <Index name="stub2" resnums="374" />
+        <Not name="noS2" selector="stub2"/>
+        <And name="peptide_noS2" selectors="peptide,noS2"/>
+        <Index name="pep_repack_only" resnums="374" />
+        <!--Selecting the interfaces-->
+        <Neighborhood name="interface" selector="peptide" distance="10.0"/>
+        <And name="interface_A" selectors="interface,HDAC"/>
+        <Or name="pep_int" selectors="interface,peptide"/>
+        <!--making sure that D and L residue are designed properly-->
+        <Phi name="posPhi" select_positive_phi="true" />
+        <And name="posPhi_pep" selectors="peptide,posPhi"/>
+        <Phi name="negPhi" select_positive_phi="false" />
+        <And name="negPhi_pep" selectors="peptide,negPhi"/>
+        <!--Checking for unsatisfied hydrogen bonds-->
+        <Unsat name="unsats" consider_mainchain_only="true" check_acceptors="false"  scorefxn="score" legacy="false"/>
+        <And name="pep_unsats" selectors="unsats,peptide"/>
+        <Not name="not_unsats" selector="pep_unsats"/>
+    </RESIDUE_SELECTORS>
+    
+	<TASKOPERATIONS>
+        <!--proper resfiles for designing D or L residues-->
+        <ReadResfile name="l_res" filename="l_res_ncAA.txt" selector="negPhi_pep"/>
+        <ReadResfile name="d_res" filename="d_res_ncAA.txt" selector="posPhi_pep"/>
+        <!--Setting up the designable and repackable regions so that HDAC does not get designed and only parts around binder repack-->
+        <RestrictChainToRepacking name="only_repack_chain" chain="1"/>
+        <OperateOnResidueSubset name="no_design_SHA" selector="pep_repack_only">
+            <RestrictToRepackingRLT/>
+        </OperateOnResidueSubset>
+        <OperateOnResidueSubset name="no_repack_ZN" selector="zinc">
+            <PreventRepackingRLT/>
+        </OperateOnResidueSubset>
+        <OperateOnResidueSubset name="no_repack_except_interface">
+            <And>
+                <Chain chains="A"/>
+                   <Not>
+                      <Neighborhood distance="10.0">
+                          <Chain chains="B"/>
+                      </Neighborhood>
+                   </Not>
+            </And>
+            <PreventRepackingRLT />
+        </OperateOnResidueSubset>
+        <OperateOnResidueSubset name="to_check_unsats" selector="not_unsats">
+             <PreventRepackingRLT />
+        </OperateOnResidueSubset>
+        <!--design related task operations-->
+        <LimitAromaChi2 name="limchi2"/>
+        <IncludeCurrent name="current"/>
+	</TASKOPERATIONS>
+    
+    <!--Selecting jumps and regions allowed to minimize-->
+    <JUMP_SELECTORS>
+        <JumpIndex name="jump1" jump="1" />
+        <JumpIndex name="jump2" jump="2" />
+        <And name="fixed_jumps" selectors="jump1,jump2" />
+        <Not name="movable_jumps" selector="fixed_jumps" />
+    </JUMP_SELECTORS>
+    <MOVE_MAP_FACTORIES>
+        <MoveMapFactory name="des_mm" bb="false" chi="false" jumps="false">
+            <Backbone residue_selector="peptide_noS2" />
+            <Chi residue_selector="peptide" />
+            <Jumps jump_selector="movable_jumps" />
+        </MoveMapFactory>
+    </MOVE_MAP_FACTORIES>
+    <!--Counting unsatisfied hydrogen bonds-->
+    <SIMPLE_METRICS>
+        <SelectedResidueCountMetric name="count" residue_selector="pep_unsats" />
+    </SIMPLE_METRICS>
+	<FILTERS>
+        <SimpleMetricFilter name="unsats_res" metric="count" cutoff="10" comparison_type="lt"/>
+  	</FILTERS>
+    
+	<MOVERS>
+        <!--autoamtically set atom tree that does not mess up minimization-->
+        <AtomTree name="docking_tree" docking_ft="1"/>
+        <!--Adds the required constraints to peptide bond to keep it close-->
+        <PeptideCyclizeMover name="cyclize" residue_selector="peptide"/>
+        <!--Small backbone movements-->
+        <Shear name="shakeit" residue_selector="peptide" scorefxn="score" nmoves="3"/>
+        <!--Add composition for the design-->
+        <AddCompositionConstraintMover name="general_comp" filename="general.comp" selector="peptide" />
+        <!--Design-->
+        <FastDesign name="design" task_operations="d_res,l_res,only_repack_chain,no_repack_except_interface,no_design_SHA,no_repack_ZN,limchi2,current" scorefxn="score_cst_comp_guide" repeats="3" ramp_down_constraints="false" movemap_factory="des_mm" />
+   	</MOVERS>
+    
+	<APPLY_TO_POSE>
+	</APPLY_TO_POSE>
+    
+	<PROTOCOLS>
+        <Add mover_name="docking_tree"/>
+        <Add mover_name="cyclize"/>
+        <Add mover_name="general_comp"/>
+        <Add mover_name="design"/>
+        <Add mover_name="cyclize"/>
+        <Add filter_name="unsats_res"/>
+	</PROTOCOLS>
+	<OUTPUT />
+</ROSETTASCRIPTS>

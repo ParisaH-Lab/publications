@@ -1,0 +1,106 @@
+<ROSETTASCRIPTS>
+	<SCOREFXNS>
+        <!--Score with constraint and composition turned on-->
+        <ScoreFunction name="beta_cst_comp" weights="ref2015.wts">
+            <Reweight scoretype="atom_pair_constraint" weight="1.0"/>
+            <Reweight scoretype="angle_constraint" weight="1.0"/>
+            <Reweight scoretype="dihedral_constraint" weight="1.0"/>
+            <Reweight scoretype="aa_composition" weight="1.0" />
+        </ScoreFunction>
+	</SCOREFXNS>
+    
+    <RESIDUE_SELECTORS>
+        
+        <!--electing residues that are important for metal coordination into HDACs-->
+        <Index name="HDAC2_ligands" resnums="196B,198B,290B"/>
+        
+        <!--selecting the chains-->
+        <Chain name="peptide" chains="1"/>
+        <Chain name="HDAC" chains="2"/>
+        <Chain  name="zinc" chains="3"/>
+        <Neighborhood name="interface" selector="peptide" distance="10.0"/>
+        <And name="interface_A" selectors="interface,HDAC"/>
+        <Or name="pep_int" selectors="interface,peptide"/>
+        
+        <!--making sure that D and L residue are designed properly-->
+        <Phi name="posPhi" select_positive_phi="true" />
+        <And name="posPhi_pep" selectors="peptide,posPhi"/>
+        <Phi name="negPhi" select_positive_phi="false" />
+        <And name="negPhi_pep" selectors="peptide,negPhi"/>
+        
+        <!--SHA is the main reason for binding, so should not be designed away-->
+        <ResidueName name="SHA_sel" residue_names="SHA" />
+        <ResiduePDBInfoHasLabel name="xlink" property="XLINK" />
+    </RESIDUE_SELECTORS>
+    
+	<TASKOPERATIONS>
+        
+        <!--proper resfiles for designing D or L residues-->
+        <ReadResfile name="l_res" filename="l_res.txt" selector="negPhi_pep"/>
+        <ReadResfile name="d_res" filename="d_res.txt" selector="posPhi_pep"/>
+        
+        <!--setting up the designable and repackable regions so that HDAC does not get designed and only parts around binder repack-->
+        <RestrictChainToRepacking name="only_repack_chain" chain="2"/>
+        <OperateOnResidueSubset name="no_repack_HDAC2_ligands" selector="HDAC2_ligands">
+            <PreventRepackingRLT/>
+        </OperateOnResidueSubset>
+        <OperateOnResidueSubset name="no_repack_xlink" selector="xlink">
+            <PreventRepackingRLT/>
+        </OperateOnResidueSubset>
+        <OperateOnResidueSubset name="no_design_SHA" selector="SHA_sel">
+            <RestrictToRepackingRLT/>
+        </OperateOnResidueSubset>
+        <DisallowIfNonnative name="no_cys" disallow_aas="C"/>
+        <OperateOnResidueSubset name="no_repack_except_interface">
+            <And>
+                <Chain chains="B"/>
+                   <Not>
+                      <Neighborhood distance="10.0">
+                          <Chain chains="A"/>
+                      </Neighborhood>
+                   </Not>
+            </And>
+            <PreventRepackingRLT />
+        </OperateOnResidueSubset>
+        
+        <!--design related task operations-->
+        <LimitAromaChi2 name="limchi2"/>
+        <IncludeCurrent name="current"/>
+        
+	</TASKOPERATIONS>
+    
+	<FILTERS>
+	</FILTERS>
+    
+	<MOVERS>
+        
+        <!--autoamtically set a useful atom tree that does not mess up minimization-->
+        <AtomTree name="docking_tree" docking_ft="1"/>
+
+        <!--Adds the required constraints to peptide bond to keep it close-->
+        <PeptideCyclizeMover name="cyclize" residue_selector="peptide"/>
+        
+        <!--Add overall comp-->
+        <AddCompositionConstraintMover name="general_comp" filename="general.comp" selector="peptide" />
+        
+        <!--normal design-->
+        <FastDesign name="design" task_operations="d_res,l_res,only_repack_chain,no_repack_except_interface,no_design_SHA,no_cys,limchi2,current,no_repack_xlink" scorefxn="beta_cst_comp" repeats="3" ramp_down_constraints="false">
+            <MoveMap name="specifics">
+                <Jump number="1" setting="0" />
+                <Chain number="2" chi="0" bb="0"/> #have to stop from minimization or it takes forever
+            </MoveMap>
+        </FastDesign>
+	</MOVERS>
+    
+	<APPLY_TO_POSE>
+	</APPLY_TO_POSE>
+    
+	<PROTOCOLS>
+        <Add mover="docking_tree"/>
+        <Add mover="cyclize"/>
+        <Add mover="general_comp"/>
+        <Add mover="design"/>
+        <Add mover="cyclize"/>
+	</PROTOCOLS>
+	<OUTPUT />
+</ROSETTASCRIPTS>
