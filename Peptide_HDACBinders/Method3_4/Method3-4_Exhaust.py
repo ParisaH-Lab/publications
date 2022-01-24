@@ -26,6 +26,7 @@ from pyrosetta.rosetta.core.select.residue_selector import ChainSelector
 from pyrosetta.rosetta.core.select.residue_selector import AndResidueSelector
 from pyrosetta.rosetta.core.select.residue_selector import NeighborhoodResidueSelector
 from pyrosetta.rosetta.protocols.residue_selectors import UnsatSelector
+#UnsatSelector has moved to pyrosetta.rosetta.protocols.hbnet in newer Rosetta versions
 from pyrosetta.rosetta.core.select.residue_selector import ResiduePDBInfoHasLabelSelector
 from pyrosetta.rosetta.protocols.simple_filters import ShapeComplementarityFilter
 from pyrosetta.rosetta.protocols.simple_ddg import DdgFilter
