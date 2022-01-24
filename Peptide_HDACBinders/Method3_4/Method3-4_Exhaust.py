@@ -30,7 +30,6 @@ from pyrosetta.rosetta.core.select.residue_selector import ResiduePDBInfoHasLabe
 from pyrosetta.rosetta.protocols.simple_filters import ShapeComplementarityFilter
 from pyrosetta.rosetta.protocols.simple_ddg import DdgFilter
 from rosetta import *
-from crosslinker_mover import PeptideCrosslinkerMover
 from pyrosetta.bindings.utility import bind_method
 from pyrosetta.rosetta.core.pack.rotamer_set import bb_independent_rotamers
 from pyrosetta.rosetta.core.conformation import Residue
