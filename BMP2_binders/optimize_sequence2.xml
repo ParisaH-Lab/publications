@@ -1,0 +1,268 @@
+<ROSETTASCRIPTS>
+<!--Updated script for October/November 2021 interface design. Previous script: designinterface.xml-->
+
+    <SCOREFXNS>
+      <ScoreFunction name="score" weights="ref2015.wts"/>
+    </SCOREFXNS>
+
+    <RESIDUE_SELECTORS>
+        <!--Selects the target protein and the binding protein. (A+B) and (C+D)-->
+        <Chain name="target" chains="1"/>
+        <Chain name="binder" chains="2"/>
+        <!--Selects anything within 8 of bmp as well as bmp. (A+B+C)-->
+        <Neighborhood name="target_neighborhood" selector="target"
+          distance="8.0"/>
+        <!--Selects only ligand interface residues. (C)-->
+        <And name="binder_interface" selectors="binder,target_neighborhood"/>
+        <!--Selects anything within 8 of the binder as well as the binder. (B+C+D)-->
+        <Neighborhood name="binder_neighborhood" selector="binder" distance="8.0"/>
+        <!--Selects the interface residues of both proteins. (B+C)-->
+        <And name="int" selectors="target_neighborhood,binder_neighborhood"/>
+        <!--Selects the residues of both proteins that are not at the interface-->
+        <Not name="not_int" selector="int"/>
+        <!--Selects the target interface. (B)-->
+        <And name="target_interface" selectors="target,binder_neighborhood"/>
+        <!--Selects hydrophobic residues-->
+        <ResiduePropertySelector name="hyd" properties="HYDROPHOBIC"/>
+        <!--Selects hydrophobic interface residues of the target protein-->
+        <And name="target_interface_hyd" selectors="hyd,target_interface"/>
+        <!--Selects all that is not the target interface. (A+C+D)-->
+        <Not name="target_noninterface" selector="target_interface"/>
+	      <!--Defining the residues that are not at the interface. (A+B+D)-->
+        <Not name="binder_noninterface" selector="binder_interface"/>
+        <!--Selects the binder residues that are not at the interface. (D)-->
+        <And name="binder_noninterface_without_target" selectors="binder,binder_noninterface"/>
+        <!--Selecrs the target residues that are not at the interface. (A)-->
+        <And name="target_noninterface_without_binder" selectors="target,target_noninterface"/>
+        <!--hotspots-->
+        <ResiduePDBInfoHasLabel name="hotspots" property="HOTSPOT"/>
+        <!--core-->
+        <Layer name="core" select_core="true" ball_radius="2.5"/>
+        <True name="true_sel"/>
+        <!--Gylcines and prolines-->
+        <ResidueName name="GLY_PRO" residue_names="GLY,PRO"/>
+    </RESIDUE_SELECTORS>
+
+    <TASKOPERATIONS>
+        <OperateOnResidueSubset name="hold_target_noninterface"
+			                        	selector="target_noninterface_without_binder">
+          <PreventRepackingRLT/>
+        </OperateOnResidueSubset>
+	      <OperateOnResidueSubset name="only_repack_target_interface"
+                                selector="target_interface">
+          <RestrictToRepackingRLT/>
+        </OperateOnResidueSubset>
+	      <OperateOnResidueSubset name="only_repack_hotspots"
+                                selector="hotspots">
+          <RestrictToRepackingRLT/>
+        </OperateOnResidueSubset>
+        <OperateOnResidueSubset name="hold_binder_noninterface"
+                                selector="binder_noninterface_without_target">
+          <RestrictToRepackingRLT/>
+        </OperateOnResidueSubset>
+        <OperateOnResidueSubset name="hold_core" selector="core">
+          <RestrictToRepackingRLT/>
+        </OperateOnResidueSubset>
+        <OperateOnResidueSubset name="hold_gly_pro" selector="GLY_PRO">
+          <RestrictToRepackingRLT/>
+        </OperateOnResidueSubset>
+    </TASKOPERATIONS>
+
+    <TASKOPERATIONS>
+      <ProteinProteinInterfaceUpweighter name="upweight" interface_weight="3.0"/>
+      <ExtraRotamersGeneric name="extra_chi" ex1="1" ex2="1" extrachi_cutoff="0"/>
+      <RestrictToRepacking name="restrict"/>
+      <InitializeFromCommandline name="init"/>
+      <RestrictToInterfaceVector name="intonly" chain1_num="1" chain2_num="2" CB_dist_cutoff="10.0"
+        nearby_atom_cutoff="5.5" vector_angle_cutoff="75.0" vector_dist_cutoff="9.0" include_all_water="1"/>
+    </TASKOPERATIONS>
+
+    <SIMPLE_METRICS>
+      <!--Sasa measurements,including polar and hydrophobic,for the interface-->
+      <SasaMetric name="tot_sasa"    residue_selector="int"    sasa_metric_mode="all_sasa"/>
+      <SasaMetric name="pol_sasa"    residue_selector="int"    sasa_metric_mode="polar_sasa"/>
+      <SasaMetric name="hyd_sasa"    residue_selector="int"    sasa_metric_mode="hydrophobic_sasa"/>
+    </SIMPLE_METRICS>
+
+    <FILTERS>
+      <!--interface complementarity-->
+      <ShapeComplementarity name="sc" min_sc="0.5"  residue_selector1="target" residue_selector2="binder"
+        jump="1" confidence="0"/>
+
+      <!--ddg with and without repack-->
+      <Ddg name="ddg_rep" chain_num="2" threshold="-1" jump="1"
+        repeats="5" repack="1" confidence="0" scorefxn="score"/>
+      <Ddg name="ddg_norep" chain_num="2" threshold="-1" jump="1"
+        repack="0" confidence="0" scorefxn="score"/>
+
+      <!--filters cooresponding to our previous sasa metrics-->
+      <SimpleMetricFilter name="filter_sasa" metric="tot_sasa"  cutoff="100" comparison_type="gt" confidence="0"/>
+      <SimpleMetricFilter name="filter_pol_sasa" metric="pol_sasa"  cutoff="100" comparison_type="gt" confidence="0"/>
+      <SimpleMetricFilter name="filter_hyd_sasa" metric="hyd_sasa"  cutoff="100" comparison_type="gt" confidence="0"/>
+
+      <!--filtering buried unsatisfied polar atoms-->
+      <BuriedUnsatHbonds name="buns_bb"
+        residue_selector="int" report_bb_heavy_atom_unsats="true"
+        scorefxn="true" cutoff="10" ignore_surface_res="false"
+        print_out_info_to_pdb="true" use_ddG_style="true" jump_number="1"
+        dalphaball_sasa="1" probe_radius="1.1" confidence="0"/>
+      <BuriedUnsatHbonds name="buns_sc"
+        residue_selector="int" report_sc_heavy_atom_unsats="true"
+        scorefxn="true" cutoff="10" ignore_surface_res="false"
+        print_out_info_to_pdb="true" use_ddG_style="true" jump_number="1"
+        dalphaball_sasa="1" probe_radius="1.1" confidence="0"/>
+      <BuriedUnsatHbonds name="buns_all"
+        residue_selector="int" report_all_heavy_atom_unsats="true"
+        scorefxn="true" cutoff="10" ignore_surface_res="false"
+        print_out_info_to_pdb="true" use_ddG_style="true" jump_number="1"
+        dalphaball_sasa="1" probe_radius="1.1" confidence="0"/>
+      <BuriedUnsatHbonds name="vbuns_bb"
+        residue_selector="int" report_bb_heavy_atom_unsats="true"
+        scorefxn="score" ignore_surface_res="false"  print_out_info_to_pdb="true"
+        atomic_depth_selection="5.5"   burial_cutoff="1000" use_ddG_style="true"
+        jump_number="1"  burial_cutoff_apo="0.2" dalphaball_sasa="true"
+        probe_radius="1.1" confidence="0" />
+      <BuriedUnsatHbonds name="vbuns_sc"
+        residue_selector="int" report_sc_heavy_atom_unsats="true"
+        scorefxn="score" ignore_surface_res="false"
+        print_out_info_to_pdb="true" atomic_depth_selection="5.5"
+        burial_cutoff="1000" use_ddG_style="true" jump_number="1"
+        burial_cutoff_apo="0.2" dalphaball_sasa="true"
+        probe_radius="1.1" confidence="0" />
+      <BuriedUnsatHbonds name="vbuns_all"
+        residue_selector="int" report_all_heavy_atom_unsats="true"
+        scorefxn="score" ignore_surface_res="false"
+        print_out_info_to_pdb="true" atomic_depth_selection="5.5"
+        burial_cutoff="1000" use_ddG_style="true" jump_number="1"
+        burial_cutoff_apo="0.2" dalphaball_sasa="true"
+        probe_radius="1.1" confidence="0" />
+
+      <!--Packing statistics-->
+      <PackStat name="pstat" threshold="0.65" chain="2" confidence="0"/>
+      <!--Holes at the protein-protein interface-->
+      <InterfaceHoles name="int_holes" jump="1" confidence="0"/>
+      <!--Secondary structures at the interface-->
+      <SSShapeComplementarity name="ss_sc" verbose="1" loops="1"
+        helices="1" min_sc="0.5" confidence="0"/>
+      <!--Holes of the binder-->
+      <Holes name="holes" threshold="1.0" residue_selector="binder"/>
+
+      <!--Interface contact-->
+      <InterfaceHydrophobicResidueContacts name="int_hydcontact"
+        target_selector="target_interface_hyd" binder_selector="binder_interface" scorefxn="score"
+        apolar_res="ALA,CYS,CYD,PHE,ILE,LEU,MET,PRO,THR,VAL,TRP,TYR"
+        confidence="0"/>
+      <AtomicContactCount name="contact" partition="jump" jump="1"
+        normalize_by_sasa="0" confidence="0"/>
+      <AtomicContactCount name="contact_norm" partition="jump" jump="1"
+        normalize_by_sasa="1" confidence="0"/>
+      <Sasa name="sasa" confidence="0"/>
+      SSPrediction name="mismatch_probability" cmd="~/psipred/runpsipred_single"
+        use_probability="1" mismatch_probability="1" use_svm="0" confidence="0"/>
+
+      <!--Packing-->
+      <ContactMolecularSurface name="cms" distance_weight="0.5"
+        target_selector="target" binder_selector="binder" confidence="0"/>
+    </FILTERS>
+
+    <SIMPLE_METRICS>
+      <SapScoreMetric name="binder_sap" score_selector="target"/>
+      <SapScoreMetric name="target_sap" score_selector="binder"/>
+      <SapScoreMetric name="binder_blocked_sap" score_selector="target"
+        sap_calculate_selector="binder" sasa_selector="true_sel"/>
+      <SapScoreMetric name="target_blocked_sap" score_selector="binder"
+        sap_calculate_selector="target" sasa_selector="true_sel"/>
+      <CalculatorMetric name="binder_delta_sap" equation="binder_sap_score - binder_blocked_sap">
+        <VAR name="binder_sap_score" metric="binder_sap"/>
+        <VAR name="binder_blocked_sap" metric="binder_blocked_sap"/>
+      </CalculatorMetric>
+      <CalculatorMetric name="target_delta_sap" equation="target_sap_score - target_blocked_sap">
+        <VAR name="target_sap_score" metric="target_sap"/>
+        <VAR name="target_blocked_sap" metric="target_blocked_sap"/>
+      </CalculatorMetric>
+    </SIMPLE_METRICS>
+
+    <JUMP_SELECTORS>
+     <JumpIndex name="jump1" jump="1"/>
+    </JUMP_SELECTORS>
+
+    <MOVE_MAP_FACTORIES>
+      <MoveMapFactory name="des_mm" bb="0" chi="0">
+        <Backbone residue_selector="int" enable="true" />
+        <Chi residue_selector="int" enable="true"/>
+        <Jumps enable="true" jump_selector="jump1"/>
+      </MoveMapFactory>
+    </MOVE_MAP_FACTORIES>
+
+    <MOVERS>
+      <!--Relax before running metrics-->
+      <FastRelax name="relax" scorefxn="score" disable_design="1"
+        repeats="5" ramp_down_constraints="1" relaxscript="InterfaceRelax2019">
+        <MoveMap name="relax_mm" bb="1" chi="1" jump="1">
+          <ResidueSelector selector="not_int" chi="0" bb="0" bondangle="0" bondlength="0"/>
+          <Jump number="1" setting="true"/>
+        </MoveMap>
+      </FastRelax>
+      <!--Mover for the interface interaction-->
+      <InterfaceAnalyzerMover name="inter_move" scorefxn="score"
+        packstat="true" interface_sc="true" jump="1"/>
+      <ddG name="ddg_move" scorefxn="score" chain_num="2" solvate="1"
+        repack_bound="1" repack_unbound="1" solvate_rbmin="0"
+        solvate_unbound="0" min_water_jump="1"
+        task_operations="intonly,restrict,extra_chi"/>
+      <RunSimpleMetrics name="metric1" metrics="tot_sasa" prefix="t_"/>
+      <RunSimpleMetrics name="metric2" metrics="pol_sasa" prefix="p_"/>
+      <RunSimpleMetrics name="metric3" metrics="hyd_sasa" prefix="h_"/>
+      <RunSimpleMetrics name="bsap" metrics="binder_sap" prefix="b_"/>
+      <RunSimpleMetrics name="tsap" metrics="target_sap" prefix="t_"/>
+      <RunSimpleMetrics name="bblock_sap" metrics="binder_blocked_sap" prefix="bb_"/>
+      <RunSimpleMetrics name="tblock_sap" metrics="target_blocked_sap" prefix="tb_"/>
+      <RunSimpleMetrics name="b_delta_sap" metrics="binder_delta_sap" prefix="bd_"/>
+      <RunSimpleMetrics name="t_delta_sap" metrics="target_delta_sap" prefix="td_"/>
+    </MOVERS>
+
+    <MOVERS>
+	    <FastDesign name="fast_design" scorefxn="score" relaxscript="InterfaceDesign2019"
+        task_operations="hold_target_noninterface,hold_binder_noninterface,only_repack_target_interface,only_repack_hotspots,upweight,hold_gly_pro"
+        movemap_factory="des_mm" repeats="8"/>
+      <FavorNativeResidue name="nonnative_penalty" bonus="1.5"/>
+    </MOVERS>
+
+    <PROTOCOLS>
+      <Add mover="relax"/>
+      <Add mover="nonnative_penalty"/>
+      <Add mover="fast_design"/>
+      <Add mover="inter_move"/>
+      <Add filter="sc"/>
+      <Add filter="ddg_rep"/>
+      <Add filter="ddg_norep"/>
+      <Add filter="filter_sasa"/>
+      <Add filter="filter_pol_sasa"/>
+      <Add filter="filter_hyd_sasa"/>
+      <Add filter="buns_bb"/>
+      <Add filter="buns_sc"/>
+      <Add filter="buns_all"/>
+      <Add filter="vbuns_bb"/>
+      <Add filter="vbuns_sc"/>
+      <Add filter="vbuns_all"/>
+      <Add filter="pstat"/>
+      <Add filter="int_holes"/>
+      <Add filter="ss_sc"/>
+      <Add filter="int_hydcontact"/>
+      <Add filter="holes"/>
+      <Add filter="contact"/>
+      <Add filter="contact_norm"/>
+      <Add filter="sasa"/>
+      Add filter="mismatch_probability"/>
+      <Add filter="cms"/>
+      <Add mover="bsap"/>
+      <Add mover="tsap"/>
+      <Add mover="bblock_sap"/>
+      <Add mover="tblock_sap"/>
+      <Add mover="b_delta_sap"/>
+      <Add mover="t_delta_sap"/>
+    </PROTOCOLS>
+
+    <OUTPUT />
+
+</ROSETTASCRIPTS>
