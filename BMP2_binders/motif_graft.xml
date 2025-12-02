@@ -1,0 +1,35 @@
+<ROSETTASCRIPTS>
+    <SCOREFXNS>
+      <ScoreFunction name="high_hbond" weights="ref2015.wts">
+      		<Reweight scoretype="hbond_lr_bb" weight="10"/>
+      		<Reweight scoretype="hbond_sr_bb" weight="10"/>
+      	</ScoreFunction>
+    </SCOREFXNS>
+    <RESIDUE_SELECTORS>
+    </RESIDUE_SELECTORS>
+    <TASKOPERATIONS>
+    </TASKOPERATIONS>
+    <SIMPLE_METRICS>
+    </SIMPLE_METRICS>
+    <FILTERS>
+      <SSPrediction name="mismatch_probability" cmd="</home/bburress/parisahlab/pyrosetta-2020.50.post0.dev0+978.master.edd2dcd21e3-py3.8-linux-x86_64.egg/psipred/runpsipred_single>" use_probability="1"
+      mismatch_probability="1" use_svm="0" confidence="0"/>
+    </FILTERS>
+    <MOVERS>
+      <MotifGraft name="motif_grafting"
+          context_structure="bmp2_relaxed.pdb"
+          motif_structure="%%motif%%"
+          RMSD_tolerance="1.5"
+          clash_score_cutoff="5"
+          clash_test_residue="ALA"
+          full_motif_bb_alignment="1"
+          revert_graft_to_native_sequence="1"
+          combinatory_fragment_size_delta="0:0"
+          allow_repeat_same_graft_output="0" />
+    </MOVERS>
+    <PROTOCOLS>
+      <Add mover="motif_grafting"/>
+      <Add filter="mismatch_probability"/>
+    </PROTOCOLS>
+    <OUTPUT />
+</ROSETTASCRIPTS>
