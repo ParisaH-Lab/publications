@@ -1,0 +1,13 @@
+#!/bin/bash
+#SBATCH --account=xxx   ### change this to your actual account for charging
+#SBATCH --partition=compute       ### queue to submit to
+#SBATCH --job-name=relax        ### job name
+#SBATCH --output=relax.out      ### file in which to store job stdout
+#SBATCH --error=relax.err       ### file in which to store job stderr
+#SBATCH --time=24:00:00              ### wall-clock time limit, in minutes
+#SBATCH --mem=6G                ### memory limit per node, in GB
+#SBATCH --nodes=1               ### number of nodes to use
+#SBATCH --ntasks-per-node=1     ### number of tasks to launch per node
+#SBATCH --cpus-per-task=1       ### number of cores for each task
+
+../Rosetta/main/source/bin/relax.default.linuxgccrelease -in:file:s *.pdb -relax:fast -relax:constrain_relax_to_start_coords -relax:coord_constrain_sidechains -relax:ignore_unrecognized_res -relax:ramp_constraints false -ex1 -ex2 -use_input_sc -flip_HNQ -no_optH false
