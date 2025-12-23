@@ -1,0 +1,17 @@
+#!/bin/bash
+#SBATCH --account=xxx    ### change this to your actual account for charging
+#SBATCH --partition=short       ### queue to submit to
+#SBATCH --job-name=graft        ### job name
+#SBATCH --output=%x-%j.out      ### file in which to store job stdout
+#SBATCH --error=%x-%j.err       ### file in which to store job stderr
+#SBATCH --time=1440             ### wall-clock time limit, in minutes
+#SBATCH --mem=1G                ### memory limit per node, in GB
+#SBATCH --nodes=1               ### number of nodes to use
+#SBATCH --ntasks-per-node=1     ### number of tasks to launch per node
+#SBATCH --cpus-per-task=1       ### number of cores for each task
+
+
+while read struct
+do
+../Rosetta/main/source/bin/rosetta_scripts.default.linuxgccrelease -parser:protocol motif_graft.xml -in:file:s $struct -parser:script_vars motif=motif_rlx_aln_untrimmed__aln_bmp2_relaxed.pdb-$1.pdb -out:prefix $1
+done < scaffold.list
