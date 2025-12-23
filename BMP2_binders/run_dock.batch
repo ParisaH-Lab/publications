@@ -1,0 +1,14 @@
+#!/bin/bash
+#SBATCH --account=xxx    ### change this to your actual account for charging
+#SBATCH --partition=long       ### queue to submit to
+#SBATCH --job-name=relax        ### job name
+#SBATCH --output=relax.out      ### file in which to store job stdout
+#SBATCH --error=relax.err       ### file in which to store job stderr
+#SBATCH --time=1440             ### wall-clock time limit, in minutes
+#SBATCH --mem=1G                ### memory limit per node, in GB
+#SBATCH --nodes=1               ### number of nodes to use
+#SBATCH --ntasks-per-node=1     ### number of tasks to launch per node
+#SBATCH --cpus-per-task=1       ### number of cores for each task
+
+
+../Rosetta/main/source/bin/docking_protocol.default.linuxgccrelease -s actRbmp2_0001.pdb -docking:partners A_B -docking:dock_pert 3 8 -ex1 -ex2aro -score:docking_interface_score 1 -use_input_sc true -nstruct 50000 -out:file:silent actRbmp2.out
