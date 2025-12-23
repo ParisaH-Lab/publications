@@ -1,0 +1,16 @@
+#!/bin/bash
+#SBATCH --account=xxx    ### change this to your actual account for charging
+#SBATCH --partition=short       ### queue to submit to
+#SBATCH --job-name=relax        ### job name
+#SBATCH --output=relax.out      ### file in which to store job stdout
+#SBATCH --error=relax.err       ### file in which to store job stderr
+#SBATCH --time=120              ### wall-clock time limit, in minutes
+#SBATCH --mem=1G                ### memory limit per node, in GB
+#SBATCH --nodes=1               ### number of nodes to use
+#SBATCH --ntasks-per-node=1     ### number of tasks to launch per node
+#SBATCH --cpus-per-task=1       ### number of cores for each task
+
+for pdb in sheets2/*pdb
+do
+  python minimize_strands.py -s bmp2_relaxed.pdb -strand $pdb -threshold -2.5
+done
