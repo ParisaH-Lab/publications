@@ -1,0 +1,16 @@
+#!/bin/bash
+#SBATCH --account=xxx    ### change this to your actual account for charging
+#SBATCH --partition=long        ### queue to submit to
+#SBATCH --job-name=design       ### job name
+#SBATCH --output=design.out     ### file in which to store job stdout
+#SBATCH --error=design.err      ### file in which to store job stderr
+#SBATCH --time=3000             ### wall-clock time limit, in minutes
+#SBATCH --mem=1G                ### memory limit per node, in GB
+#SBATCH --nodes=1               ### number of nodes to use
+#SBATCH --ntasks-per-node=1     ### number of tasks to launch per node
+#SBATCH --cpus-per-task=1       ### number of cores for each task
+
+for struct in motif_graft2/*pdb
+do
+../Rosetta/main/source/bin/rosetta_scripts.default.linuxgccrelease -parser:protocol optimize_sequence.xml -in:file:s $struct -holes:dalphaball ../Rosetta/main/source/external/DAlpahBall/DAlphaBall.gcc -out:file:silent design_2203.out
+done
