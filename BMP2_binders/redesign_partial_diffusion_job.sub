@@ -1,0 +1,16 @@
+#Example .sub file for RFDiffusion submission
+executable = ./rfdiffusion/run_inference.py
+
+arguments = "inference.output_prefix=./bb1_partial_ inference.input_pdb=./bmp2_binder.input 'contigmap.contigs=[96-96/0 C1-209]' diffuser.partial_T=25 inference.num_designs=1000"
+
+JobBatchName=bburress
+
+log = rfdiffusion.log
+
+error = rfdiffusion.err
+
+output = rfdiffusion.log
+
+getenv = True
+
+queue
